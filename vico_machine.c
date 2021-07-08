@@ -1,3 +1,26 @@
+/*
+ * ARM Versatile Express emulation.
+ *
+ * Copyright (c) 2010 - 2011 B Labs Ltd.
+ * Copyright (c) 2011 Linaro Limited
+ * Written by Bahadir Balban, Amit Mahajan, Peter Maydell
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License version 2 as
+ *  published by the Free Software Foundation.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, see <http://www.gnu.org/licenses/>.
+ *
+ *  Contributions after 2012-01-13 are licensed under the terms of the
+ *  GNU GPL, version 2 or (at your option) any later version.
+ */
+
 #include "qemu/osdep.h"
 #include "qapi/error.h"
 #include "qemu-common.h"
@@ -6,7 +29,8 @@
 #include "hw/sysbus.h"
 #include "hw/arm/boot.h"
 #include "hw/arm/primecell.h"
-
+#include "hw/net/lan9118.h"
+#include "hw/i2c/i2c.h"
 #include "net/net.h"
 #include "sysemu/sysemu.h"
 #include "hw/boards.h"
@@ -15,9 +39,11 @@
 #include "sysemu/device_tree.h"
 #include "qemu/error-report.h"
 #include <libfdt.h>
-
+#include "hw/char/pl011.h"
 #include "hw/cpu/a9mpcore.h"
-
+#include "hw/cpu/a15mpcore.h"
+#include "hw/i2c/arm_sbcon_i2c.h"
+#include "hw/sd/sd.h"
 #include "qom/object.h"
 
 #include "hw/arm/vico_machine.h"
@@ -132,17 +158,63 @@ static void a9_daughterboard_init(const VicoMachineState *vms,
     MachineState *machine = MACHINE(vms);
     MemoryRegion *sysmem = get_system_memory();
     MemoryRegion *lowram = g_new(MemoryRegion, 1);
+    ram_addr_t low_ram_size;
 
+    // if (ram_size > 0x40000000) {
+    //     /* 1GB is the maximum the address space permits */
+    //     error_report("Vico-a9: cannot model more than 1GB RAM");
+    //     exit(1);
+    // }
+
+    low_ram_size = ram_size;
+    // if (low_ram_size > 0x4000000) {
+    //     low_ram_size = 0x4000000;
+    // }
+    /* RAM is from 0x60000000 upwards. The bottom 64MB of the
+     * address space should in theory be remappable to various
+     * things including ROM or RAM; we always map the RAM there.
+     */
     memory_region_init_alias(lowram, NULL, "Vico.lowmem", machine->ram,
-                             0, ram_size);
+                             0, low_ram_size);
     memory_region_add_subregion(sysmem, 0x0, lowram);
     memory_region_add_subregion(sysmem, 0x60000000, machine->ram);
 
     /* 0x1e000000 A9MPCore (SCU) private memory region */
     init_cpus(machine, cpu_type, TYPE_A9MPCORE_PRIV, 0x1e000000, pic,
               vms->secure, vms->virt);
+
+    /* Daughterboard peripherals : 0x10020000 .. 0x20000000 */
+
+    /* 0x10020000 PL111 CLCD (daughterboard) */
+    sysbus_create_simple("pl111", 0x10020000, pic[44]);
+
+    /* 0x10060000 AXI RAM */
+    /* 0x100e0000 PL341 Dynamic Memory Controller */
+    /* 0x100e1000 PL354 Static Memory Controller */
+    /* 0x100e2000 System Configuration Controller */
+
+    sysbus_create_simple("sp804", 0x100e4000, pic[48]);
+    /* 0x100e5000 SP805 Watchdog module */
+    /* 0x100e6000 BP147 TrustZone Protection Controller */
+    /* 0x100e9000 PL301 'Fast' AXI matrix */
+    /* 0x100ea000 PL301 'Slow' AXI matrix */
+    /* 0x100ec000 TrustZone Address Space Controller */
+    /* 0x10200000 CoreSight debug APB */
+    /* 0x1e00a000 PL310 L2 Cache Controller */
+    sysbus_create_varargs("l2x0", 0x1e00a000, NULL);
 }
 
+/* Voltage values for SYS_CFG_VOLT daughterboard registers;
+ * values are in microvolts.
+ */
+static const uint32_t a9_voltages[] = {
+    1000000, /* VD10 : 1.0V : SoC internal logic voltage */
+    1000000, /* VD10_S2 : 1.0V : PL310, L2 cache, RAM, non-PL310 logic */
+    1000000, /* VD10_S3 : 1.0V : Cortex-A9, cores, MPEs, SCU, PL310 logic */
+    1800000, /* VCC1V8 : 1.8V : DDR2 SDRAM, test chip DDR2 I/O supply */
+    900000, /* DDR2VTT : 0.9V : DDR2 SDRAM VTT termination voltage */
+    3300000, /* VCC3V3 : 3.3V : local board supply for misc external logic */
+};
 
 /* Reset values for daughterboard oscillators (in Hz) */
 static const uint32_t a9_clocks[] = {
@@ -156,11 +228,86 @@ static VICBoardInfo a9_daughterboard = {
     .loader_start = 0x60000000,
     .gic_cpu_if_addr = 0x1e000100,
     .proc_id = 0x0c000191,
-
+    .num_voltage_sensors = ARRAY_SIZE(a9_voltages),
+    .voltages = a9_voltages,
     .num_clocks = ARRAY_SIZE(a9_clocks),
     .clocks = a9_clocks,
     .init = a9_daughterboard_init,
 };
+//
+// static void a15_daughterboard_init(const VicoMachineState *vms,
+//                                    ram_addr_t ram_size,
+//                                    const char *cpu_type,
+//                                    qemu_irq *pic)
+// {
+//     MachineState *machine = MACHINE(vms);
+//     MemoryRegion *sysmem = get_system_memory();
+//     MemoryRegion *sram = g_new(MemoryRegion, 1);
+//
+//     {
+//         /* We have to use a separate 64 bit variable here to avoid the gcc
+//          * "comparison is always false due to limited range of data type"
+//          * warning if we are on a host where ram_addr_t is 32 bits.
+//          */
+//         uint64_t rsz = ram_size;
+//         if (rsz > (30ULL * 1024 * 1024 * 1024)) {
+//             error_report("vico-a15: cannot model more than 30GB RAM");
+//             exit(1);
+//         }
+//     }
+//
+//     /* RAM is from 0x80000000 upwards; there is no low-memory alias for it. */
+//     memory_region_add_subregion(sysmem, 0x80000000, machine->ram);
+//
+//     /* 0x2c000000 A15MPCore private memory region (GIC) */
+//     init_cpus(machine, cpu_type, TYPE_A15MPCORE_PRIV,
+//               0x2c000000, pic, vms->secure, vms->virt);
+//
+//     /* A15 daughterboard peripherals: */
+//
+//     /* 0x20000000: CoreSight interfaces: not modelled */
+//     /* 0x2a000000: PL301 AXI interconnect: not modelled */
+//     /* 0x2a420000: SCC: not modelled */
+//     /* 0x2a430000: system counter: not modelled */
+//     /* 0x2b000000: HDLCD controller: not modelled */
+//     /* 0x2b060000: SP805 watchdog: not modelled */
+//     /* 0x2b0a0000: PL341 dynamic memory controller: not modelled */
+//     /* 0x2e000000: system SRAM */
+//     memory_region_init_ram(sram, NULL, "vico.a15sram", 0x10000,
+//                            &error_fatal);
+//     memory_region_add_subregion(sysmem, 0x2e000000, sram);
+//
+//     /* 0x7ffb0000: DMA330 DMA controller: not modelled */
+//     /* 0x7ffd0000: PL354 static memory controller: not modelled */
+// }
+//
+// static const uint32_t a15_voltages[] = {
+//     900000, /* Vcore: 0.9V : CPU core voltage */
+// };
+//
+// static const uint32_t a15_clocks[] = {
+//     60000000, /* OSCCLK0: 60MHz : CPU_CLK reference */
+//     0, /* OSCCLK1: reserved */
+//     0, /* OSCCLK2: reserved */
+//     0, /* OSCCLK3: reserved */
+//     40000000, /* OSCCLK4: 40MHz : external AXI master clock */
+//     23750000, /* OSCCLK5: 23.75MHz : HDLCD PLL reference */
+//     50000000, /* OSCCLK6: 50MHz : static memory controller clock */
+//     60000000, /* OSCCLK7: 60MHz : SYSCLK reference */
+//     40000000, /* OSCCLK8: 40MHz : DDR2 PLL reference */
+// };
+//
+// static VICBoardInfo a15_daughterboard = {
+//     .motherboard_map = motherboard_aseries_map,
+//     .loader_start = 0x80000000,
+//     .gic_cpu_if_addr = 0x2c002000,
+//     .proc_id = 0x14000237,
+//     .num_voltage_sensors = ARRAY_SIZE(a15_voltages),
+//     .voltages = a15_voltages,
+//     .num_clocks = ARRAY_SIZE(a15_clocks),
+//     .clocks = a15_clocks,
+//     .init = a15_daughterboard_init,
+// };
 
 static int add_virtio_mmio_node(void *fdt, uint32_t acells, uint32_t scells,
                                 hwaddr addr, hwaddr size, uint32_t intc,
@@ -279,12 +426,13 @@ static void vico_common_init(MachineState *machine)
     VicoMachineState *vms = VICO_MACHINE(machine);
     VicoMachineClass *vmc = VICO_MACHINE_GET_CLASS(machine);
     VICBoardInfo *daughterboard = vmc->daughterboard;
-    DeviceState *sysctl;// *pl041, *dev,;
+    DeviceState *dev, *sysctl;
+    //*pl041
     qemu_irq pic[64];
     uint32_t sys_id;
     DriveInfo *dinfo;
     PFlashCFI01 *pflash0;
-
+    I2CBus *i2c;
     ram_addr_t vram_size, sram_size;
     MemoryRegion *sysmem = get_system_memory();
     MemoryRegion *vram = g_new(MemoryRegion, 1);
@@ -349,6 +497,52 @@ static void vico_common_init(MachineState *machine)
     sysbus_realize_and_unref(SYS_BUS_DEVICE(sysctl), &error_fatal);
     sysbus_mmio_map(SYS_BUS_DEVICE(sysctl), 0, map[SYSREGS]);
 
+    /* SP810: not modelled */
+    /* SERIALPCI: not modelled */
+
+    // pl041 = qdev_new("pl041");
+    // qdev_prop_set_uint32(pl041, "nc_fifo_depth", 512);
+    // sysbus_realize_and_unref(SYS_BUS_DEVICE(pl041), &error_fatal);
+    // sysbus_mmio_map(SYS_BUS_DEVICE(pl041), 0, map[PL041]);
+    // sysbus_connect_irq(SYS_BUS_DEVICE(pl041), 0, pic[11]);
+
+    dev = sysbus_create_varargs("pl181", map[MMCI], pic[9], pic[10], NULL);
+    /* Wire up MMC card detect and read-only signals */
+    qdev_connect_gpio_out_named(dev, "card-read-only", 0,
+                          qdev_get_gpio_in(sysctl, ARM_SYSCTL_GPIO_MMC_WPROT));
+    qdev_connect_gpio_out_named(dev, "card-inserted", 0,
+                          qdev_get_gpio_in(sysctl, ARM_SYSCTL_GPIO_MMC_CARDIN));
+    dinfo = drive_get_next(IF_SD);
+    if (dinfo) {
+        DeviceState *card;
+
+        card = qdev_new(TYPE_SD_CARD);
+        qdev_prop_set_drive_err(card, "drive", blk_by_legacy_dinfo(dinfo),
+                                &error_fatal);
+        qdev_realize_and_unref(card, qdev_get_child_bus(dev, "sd-bus"),
+                               &error_fatal);
+    }
+
+    sysbus_create_simple("pl050_keyboard", map[KMI0], pic[12]);
+    sysbus_create_simple("pl050_mouse", map[KMI1], pic[13]);
+
+    pl011_create(map[UART0], pic[5], serial_hd(0));
+    pl011_create(map[UART1], pic[6], serial_hd(1));
+    pl011_create(map[UART2], pic[7], serial_hd(2));
+    pl011_create(map[UART3], pic[8], serial_hd(3));
+
+    sysbus_create_simple("sp804", map[TIMER01], pic[2]);
+    sysbus_create_simple("sp804", map[TIMER23], pic[3]);
+
+    dev = sysbus_create_simple(TYPE_VERSATILE_I2C, map[SERIALDVI], NULL);
+    i2c = (I2CBus *)qdev_get_child_bus(dev, "i2c");
+    i2c_slave_create_simple(i2c, "sii9022", 0x39);
+
+    sysbus_create_simple("pl031", map[RTC], pic[4]); /* RTC */
+
+    /* COMPACTFLASH: not modelled */
+
+    sysbus_create_simple("pl111", map[CLCD], pic[14]);
 
     dinfo = drive_get_next(IF_PFLASH);
     pflash0 = vi_pflash_cfi01_register(map[NORFLASH0], "vico.flash0",
@@ -384,9 +578,9 @@ static void vico_common_init(MachineState *machine)
     memory_region_add_subregion(sysmem, map[VIDEORAM], vram);
 
     /* 0x4e000000 LAN9118 Ethernet */
-    // if (nd_table[0].used) {
-    //     lan9118_init(&nd_table[0], map[ETHERNET], pic[15]);
-    // }
+    if (nd_table[0].used) {
+        lan9118_init(&nd_table[0], map[ETHERNET], pic[15]);
+    }
 
     /* USB: not modelled */
 
@@ -428,6 +622,19 @@ static void vico_set_secure(Object *obj, bool value, Error **errp)
     vms->secure = value;
 }
 
+// static bool vico_get_virt(Object *obj, Error **errp)
+// {
+//     VicoMachineState *vms = VICO_MACHINE(obj);
+//
+//     return vms->virt;
+// }
+//
+// static void vico_set_virt(Object *obj, bool value, Error **errp)
+// {
+//     VicoMachineState *vms = VICO_MACHINE(obj);
+//
+//     vms->virt = value;
+// }
 
 static void vico_instance_init(Object *obj)
 {
@@ -437,6 +644,16 @@ static void vico_instance_init(Object *obj)
     vms->secure = true;
 }
 
+// static void vico_a15_instance_init(Object *obj)
+// {
+//     VicoMachineState *vms = VICO_MACHINE(obj);
+//
+//     /*
+//      * For the vico-a15, EL2 is by default enabled if EL3 is,
+//      * but can also be specifically set to on or off.
+//      */
+//     vms->virt = true;
+// }
 
 static void vico_a9_instance_init(Object *obj)
 {
@@ -473,7 +690,25 @@ static void vico_a9_class_init(ObjectClass *oc, void *data)
 
     vmc->daughterboard = &a9_daughterboard;
 }
-
+//
+// static void vico_a15_class_init(ObjectClass *oc, void *data)
+// {
+//     MachineClass *mc = MACHINE_CLASS(oc);
+//     VicoMachineClass *vmc = VICO_MACHINE_CLASS(oc);
+//
+//     mc->desc = "ARM Versatile Express for Cortex-A15";
+//     mc->default_cpu_type = ARM_CPU_TYPE_NAME("cortex-a15");
+//
+//     vmc->daughterboard = &a15_daughterboard;
+//
+//     object_class_property_add_bool(oc, "virtualization", vico_get_virt,
+//                                    vico_set_virt);
+//     object_class_property_set_description(oc, "virtualization",
+//                                           "Set on/off to enable/disable the ARM "
+//                                           "Virtualization Extensions "
+//                                           "(defaults to same as 'secure')");
+//
+// }
 
 static const TypeInfo vico_info = {
     .name = TYPE_VICO_MACHINE,
@@ -491,6 +726,13 @@ static const TypeInfo vico_a9_info = {
     .class_init = vico_a9_class_init,
     .instance_init = vico_a9_instance_init,
 };
+
+// static const TypeInfo vico_a15_info = {
+//     .name = TYPE_VICO_A15_MACHINE,
+//     .parent = TYPE_VICO_MACHINE,
+//     .class_init = vico_a15_class_init,
+//     .instance_init = vico_a15_instance_init,
+// };
 
 static void vico_machine_init(void)
 {
