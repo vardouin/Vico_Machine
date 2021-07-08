@@ -523,13 +523,13 @@ static void vico_common_init(MachineState *machine)
                                &error_fatal);
     }
 
-    sysbus_create_simple("pl050_keyboard", map[KMI0], pic[12]);
-    sysbus_create_simple("pl050_mouse", map[KMI1], pic[13]);
+    //sysbus_create_simple("pl050_keyboard", map[KMI0], pic[12]);
+    //sysbus_create_simple("pl050_mouse", map[KMI1], pic[13]);
 
     pl011_create(map[UART0], pic[5], serial_hd(0));
-    pl011_create(map[UART1], pic[6], serial_hd(1));
-    pl011_create(map[UART2], pic[7], serial_hd(2));
-    pl011_create(map[UART3], pic[8], serial_hd(3));
+    // pl011_create(map[UART1], pic[6], serial_hd(1));
+    // pl011_create(map[UART2], pic[7], serial_hd(2));
+    // pl011_create(map[UART3], pic[8], serial_hd(3));
 
     sysbus_create_simple("sp804", map[TIMER01], pic[2]);
     sysbus_create_simple("sp804", map[TIMER23], pic[3]);
