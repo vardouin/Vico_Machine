@@ -532,7 +532,7 @@ static void vico_common_init(MachineState *machine)
     // pl011_create(map[UART3], pic[8], serial_hd(3));
 
     sysbus_create_simple("sp804", map[TIMER01], pic[2]);
-    sysbus_create_simple("sp804", map[TIMER23], pic[3]);
+    //sysbus_create_simple("sp804", map[TIMER23], pic[3]);
 
     //dev = sysbus_create_simple(TYPE_VERSATILE_I2C, map[SERIALDVI], NULL);
     //i2c = (I2CBus *)qdev_get_child_bus(dev, "i2c");
@@ -578,9 +578,9 @@ static void vico_common_init(MachineState *machine)
     memory_region_add_subregion(sysmem, map[VIDEORAM], vram);
 
     /* 0x4e000000 LAN9118 Ethernet */
-    if (nd_table[0].used) {
-        lan9118_init(&nd_table[0], map[ETHERNET], pic[15]);
-    }
+    // if (nd_table[0].used) {
+    //     lan9118_init(&nd_table[0], map[ETHERNET], pic[15]);
+    // }
 
     /* USB: not modelled */
 
