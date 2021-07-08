@@ -186,7 +186,7 @@ static void a9_daughterboard_init(const VicoMachineState *vms,
     /* Daughterboard peripherals : 0x10020000 .. 0x20000000 */
 
     /* 0x10020000 PL111 CLCD (daughterboard) */
-    sysbus_create_simple("pl111", 0x10020000, pic[44]);
+    //sysbus_create_simple("pl111", 0x10020000, pic[44]);
 
     /* 0x10060000 AXI RAM */
     /* 0x100e0000 PL341 Dynamic Memory Controller */
@@ -432,7 +432,7 @@ static void vico_common_init(MachineState *machine)
     uint32_t sys_id;
     DriveInfo *dinfo;
     PFlashCFI01 *pflash0;
-    I2CBus *i2c;
+    //I2CBus *i2c;
     ram_addr_t vram_size, sram_size;
     MemoryRegion *sysmem = get_system_memory();
     MemoryRegion *vram = g_new(MemoryRegion, 1);
@@ -534,15 +534,15 @@ static void vico_common_init(MachineState *machine)
     sysbus_create_simple("sp804", map[TIMER01], pic[2]);
     sysbus_create_simple("sp804", map[TIMER23], pic[3]);
 
-    dev = sysbus_create_simple(TYPE_VERSATILE_I2C, map[SERIALDVI], NULL);
-    i2c = (I2CBus *)qdev_get_child_bus(dev, "i2c");
-    i2c_slave_create_simple(i2c, "sii9022", 0x39);
+    //dev = sysbus_create_simple(TYPE_VERSATILE_I2C, map[SERIALDVI], NULL);
+    //i2c = (I2CBus *)qdev_get_child_bus(dev, "i2c");
+    //i2c_slave_create_simple(i2c, "sii9022", 0x39);
 
-    sysbus_create_simple("pl031", map[RTC], pic[4]); /* RTC */
+    //sysbus_create_simple("pl031", map[RTC], pic[4]); /* RTC (horloge a temps reel)*/
 
     /* COMPACTFLASH: not modelled */
 
-    sysbus_create_simple("pl111", map[CLCD], pic[14]);
+    //sysbus_create_simple("pl111", map[CLCD], pic[14]);
 
     dinfo = drive_get_next(IF_PFLASH);
     pflash0 = vi_pflash_cfi01_register(map[NORFLASH0], "vico.flash0",
