@@ -9,11 +9,6 @@
 #include <QSpacerItem>
 #include <stdio.h>
 #include "diode.h"
-#include "custombutton.h"
-#include "btn.h"
-#include "textsender.h"
-#include "textreceiver.h"
-#include "message.h"
 #include "sender.h"
 
 class MainWindow : public QMainWindow
@@ -24,17 +19,12 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
-
 private slots:
-    void Test(bool);
 
 private:
     Diode* my_diode;
-    //CustomButton* my_custombutton;
     QWidget* my_mainWidget;
     QVBoxLayout* my_Vlayout;
-    QVBoxLayout* my_Vlayout2;
-    QVBoxLayout* my_Vlayout3;
     QHBoxLayout* my_Hlayout;
     QSignalMapper* signalMapper;
 };

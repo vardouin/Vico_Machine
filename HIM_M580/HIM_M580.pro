@@ -9,25 +9,15 @@ CONFIG += c++11
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 QT += widgets network
 SOURCES += \
-    btn.cpp \
-    custombutton.cpp \
     diode.cpp \
     main.cpp \
     mainwindow.cpp \
-    message.cpp \
-    sender.cpp \
-    textreceiver.cpp \
-    textsender.cpp
+    sender.cpp
 
 HEADERS += \
-    btn.h \
-    custombutton.h \
     diode.h \
     mainwindow.h \
-    message.h \
-    sender.h \
-    textreceiver.h \
-    textsender.h
+    sender.h
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
