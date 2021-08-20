@@ -10,16 +10,20 @@ CONFIG += c++11
 QT += widgets network
 SOURCES += \
     diode.cpp \
+    m580.cpp \
     m580_button.cpp \
     main.cpp \
     mainwindow.cpp \
-    sender.cpp
+    sender.cpp \
+    valveusecase.cpp
 
 HEADERS += \
     diode.h \
+    m580.h \
     m580_button.h \
     mainwindow.h \
-    sender.h
+    sender.h \
+    valveusecase.h
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

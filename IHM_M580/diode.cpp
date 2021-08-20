@@ -18,7 +18,8 @@ void Diode::paintEvent(QPaintEvent *event)
     p.setPen(Qt::black);
 
     p.setBrush(m_isClicked ? Qt::darkGreen : Qt::red );
-    p.drawEllipse(6, 6,this->width()-20,this->height()-20);
+
+    p.drawEllipse((this->width())/2,(this->height())/2, 40,40);
     updateGeometry();
 }
 

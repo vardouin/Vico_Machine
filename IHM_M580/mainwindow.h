@@ -12,6 +12,7 @@
 #include "diode.h"
 #include "sender.h"
 #include "m580_button.h"
+#include "valveusecase.h"
 
 class MainWindow : public QMainWindow
 {
@@ -31,6 +32,7 @@ private:
     Sender * my_sender;
     QProcess *process;
     QWidget* my_mainWidget;
+    QVBoxLayout* my_Vlayout0;
     QVBoxLayout* my_Vlayout;
     QVBoxLayout* my_Vlayout2;
     QHBoxLayout* my_Hlayout;

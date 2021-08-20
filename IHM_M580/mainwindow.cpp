@@ -3,25 +3,33 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
+    qApp->installEventFilter(this);
+
+
     my_mainWidget = new QWidget(this);
     setCentralWidget(my_mainWidget);
     setWindowTitle("M580 IHM");
     my_mainWidget->setStyleSheet("background-color: rgb(254, 245, 231)");
 
+    my_Vlayout0 = new QVBoxLayout;
     my_Hlayout  = new QHBoxLayout;
     my_Vlayout  = new QVBoxLayout;
     my_Vlayout2 = new QVBoxLayout;
 
     my_diode    = new Diode(my_mainWidget);
     my_sender   = new Sender();
-    QSpacerItem * horizontalSpacer  = new QSpacerItem(20, 100, QSizePolicy::Expanding, QSizePolicy::Minimum);
+    QSpacerItem * horizontalSpacer  = new QSpacerItem(5, 10, QSizePolicy::Expanding, QSizePolicy::Minimum);
     M580_button * diode_button      = new M580_button(tr("&Power Diode"), my_mainWidget);
     M580_button * shbutton          = new M580_button(tr("&Launch M580"), my_mainWidget);
     M580_button * stopbutton        = new M580_button(tr("&Stop M580"), my_mainWidget);
+    ValveUsecase* my_usecase        = new ValveUsecase();
 
     connect(diode_button, SIGNAL(clicked()), my_diode, SLOT(setPower()));
     connect(shbutton    , SIGNAL(clicked()), this    , SLOT(launchbash()));
     connect(stopbutton  , SIGNAL(clicked()), this    , SLOT(killM580()));
+
+    my_Vlayout0->addLayout(my_Hlayout);
+    my_Vlayout0->addWidget(my_usecase);
 
     my_Vlayout ->addWidget(my_diode);
     my_Vlayout ->addItem(horizontalSpacer);
@@ -33,7 +41,7 @@ MainWindow::MainWindow(QWidget *parent)
     my_Hlayout->addWidget(my_sender);
     my_Hlayout->addLayout(my_Vlayout2);
 
-    my_mainWidget->setLayout(my_Hlayout);
+    my_mainWidget->setLayout(my_Vlayout0);
 
 }
 
@@ -62,6 +70,7 @@ void MainWindow::killM580()
     }
 
 }
+
 
 MainWindow::~MainWindow()
 {
